@@ -767,6 +767,39 @@ const KpiBulkAssign = () => {
           >
             بازگشت
           </button>
+          <button
+            onClick={() => {
+              const st = location.state || {};
+              const company =
+                String(st.company || searchParams.get("company") || "")
+                  .replaceAll("ي", "ی")
+                  .replaceAll("ك", "ک")
+                  .trim();
+              const dep = String(
+                st.departman || searchParams.get("departman") || ""
+              )
+                .replaceAll("ي", "ی")
+                .replaceAll("ك", "ک")
+                .trim();
+              if (company) {
+                navigate(
+                  `/kpidashboard?company=${encodeURIComponent(company)}${
+                    dep ? `&departman=${encodeURIComponent(dep)}` : ""
+                  }`,
+                  { replace: true }
+                );
+              } else {
+                navigate(-1);
+              }
+            }}
+            className={`px-3 py-2 rounded mb-2 cursor-pointer ${
+              isLight
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : "bg-green-700 text-white hover:bg-green-600"
+            }`}
+          >
+            بازگشت به داشبورد
+          </button>
           <div className="grid grid-cols-1 gap-6">
             {scope !== "all" && (
               <div

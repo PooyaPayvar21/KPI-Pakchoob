@@ -1,7 +1,7 @@
-import { Controller, Get, Query, Param } from '@nestjs/common';
-import { KPIAnalyticsService } from '../services/kpi-analytics.service';
+import { Controller, Get, Query, Param } from "@nestjs/common";
+import { KPIAnalyticsService } from "../services/kpi-analytics.service";
 
-@Controller('analytics/kpis')
+@Controller("analytics/kpis")
 export class KPIAnalyticsController {
   constructor(private analyticsService: KPIAnalyticsService) {}
 
@@ -9,16 +9,16 @@ export class KPIAnalyticsController {
    * Get department performance overview
    * GET /analytics/kpis/department/:department?quarter=Q2&fiscalYear=1404
    */
-  @Get('department/:department')
+  @Get("department/:department")
   async getDepartmentPerformance(
-    @Param('department') department: string,
-    @Query('quarter') quarter: string,
-    @Query('fiscalYear') fiscalYear: number,
+    @Param("department") department: string,
+    @Query("quarter") quarter: string,
+    @Query("fiscalYear") fiscalYear: number
   ): Promise<any> {
     return this.analyticsService.getDepartmentPerformance(
       department,
       quarter,
-      fiscalYear,
+      fiscalYear
     );
   }
 
@@ -26,10 +26,10 @@ export class KPIAnalyticsController {
    * Get employee performance trends
    * GET /analytics/kpis/employee-trends/:employeeId?year=1404
    */
-  @Get('employee-trends/:employeeId')
+  @Get("employee-trends/:employeeId")
   async getEmployeeTrends(
-    @Param('employeeId') employeeId: string,
-    @Query('year') year: number,
+    @Param("employeeId") employeeId: string,
+    @Query("year") year: number
   ): Promise<any> {
     return this.analyticsService.getEmployeePerformanceTrend(employeeId, year);
   }
@@ -38,18 +38,18 @@ export class KPIAnalyticsController {
    * Get top and bottom performers
    * GET /analytics/kpis/performers?department=Sales&quarter=Q2&fiscalYear=1404&limit=10
    */
-  @Get('performers')
+  @Get("performers")
   async getPerformers(
-    @Query('department') department: string,
-    @Query('quarter') quarter: string,
-    @Query('fiscalYear') fiscalYear: number,
-    @Query('limit') limit: number = 10,
+    @Query("department") department: string,
+    @Query("quarter") quarter: string,
+    @Query("fiscalYear") fiscalYear: number,
+    @Query("limit") limit: number = 10
   ): Promise<any> {
     return this.analyticsService.getTopBottomPerformers(
       department,
       quarter,
       fiscalYear,
-      limit,
+      limit
     );
   }
 
@@ -57,16 +57,16 @@ export class KPIAnalyticsController {
    * Get category-wise performance
    * GET /analytics/kpis/category-analysis?department=Sales&quarter=Q2&fiscalYear=1404
    */
-  @Get('category-analysis')
+  @Get("category-analysis")
   async getCategoryAnalysis(
-    @Query('department') department: string,
-    @Query('quarter') quarter: string,
-    @Query('fiscalYear') fiscalYear: number,
+    @Query("department") department: string,
+    @Query("quarter") quarter: string,
+    @Query("fiscalYear") fiscalYear: number
   ): Promise<any> {
     return this.analyticsService.getDepartmentPerformance(
       department,
       quarter,
-      fiscalYear,
+      fiscalYear
     );
   }
 
@@ -74,10 +74,10 @@ export class KPIAnalyticsController {
    * Get approval bottlenecks
    * GET /analytics/kpis/bottlenecks?department=Sales&quarter=Q2
    */
-  @Get('bottlenecks')
+  @Get("bottlenecks")
   async getBottlenecks(
-    @Query('department') department?: string,
-    @Query('quarter') quarter?: string,
+    @Query("department") department?: string,
+    @Query("quarter") quarter?: string
   ): Promise<any> {
     return this.analyticsService.getApprovalBottlenecks(department, quarter);
   }
@@ -86,16 +86,16 @@ export class KPIAnalyticsController {
    * Get achievement dashboard
    * GET /analytics/kpis/dashboard?quarter=Q2&fiscalYear=1404&department=Sales
    */
-  @Get('dashboard')
+  @Get("dashboard")
   async getDashboard(
-    @Query('quarter') quarter: string,
-    @Query('fiscalYear') fiscalYear: number,
-    @Query('department') department?: string,
+    @Query("quarter") quarter: string,
+    @Query("fiscalYear") fiscalYear: number,
+    @Query("department") department?: string
   ): Promise<any> {
     return this.analyticsService.getAchievementDashboard(
       quarter,
       fiscalYear,
-      department,
+      department
     );
   }
 
@@ -103,10 +103,10 @@ export class KPIAnalyticsController {
    * Get KPI status report
    * GET /analytics/kpis/status-report?quarter=Q2&fiscalYear=1404
    */
-  @Get('status-report')
+  @Get("status-report")
   async getStatusReport(
-    @Query('quarter') quarter: string,
-    @Query('fiscalYear') fiscalYear: number,
+    @Query("quarter") quarter: string,
+    @Query("fiscalYear") fiscalYear: number
   ): Promise<any> {
     return this.analyticsService.getKPIStatusReport(quarter, fiscalYear);
   }
@@ -115,9 +115,9 @@ export class KPIAnalyticsController {
    * Departments approval coverage based on approval_chains
    * GET /analytics/kpis/departments/approval-coverage?branch=Group
    */
-  @Get('departments/approval-coverage')
+  @Get("departments/approval-coverage")
   async getDepartmentsApprovalCoverage(
-    @Query('branch') branch?: string,
+    @Query("branch") branch?: string
   ): Promise<any[]> {
     return this.analyticsService.getDepartmentApprovalCoverage(branch);
   }

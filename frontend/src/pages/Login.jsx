@@ -87,59 +87,31 @@ const Login = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="login-body w-full" dir={"rtl"}>
-      <div className={`box`}>
-        <div
-          className="login"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="login-title"
-        >
-          <div className="loginBx">
-            <h2 id="login-title">
-              <i className="fa-solid fa-right-to-bracket ml-2"></i>
-              ورود
-            </h2>
-            {error && (
-              <div role="alert" style={{ color: "#f87171", marginBottom: 8 }}>
-                {error}
-              </div>
-            )}
-            <form
-              ref={formRef}
-              onSubmit={handleSubmit}
-              style={{ width: "100%" }}
-            >
-              <input
-                type="text"
-                name="username"
-                placeholder="نام کاربری"
-                aria-label="نام کاربری"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                required
-              />
-              <input
-                type="password"
-                name="password"
-                placeholder="رمز عبور"
-                aria-label="رمز عبور"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-              <div className="actions">
-                <input
-                  type="submit"
-                  value={loading ? "در حال ورود..." : "ورود"}
-                  disabled={loading}
-                />
-              </div>
-            </form>
+    <div className="login-container">
+      <div className="wrapper">
+        <h2 className="text-2xl text-center font-mono">ورود کارکنان</h2>
+        {error && <p style={{ color: "red" }}>{error}</p>}
+        <form onSubmit={handleSubmit}>
+          <div className="input-box">
+            <input
+              type="text"
+              name="username"
+              placeholder="نام کاربری"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
           </div>
-        </div>
+          <div className="input-box">
+            <input
+              type="password"
+              name="password"
+              placeholder="رمز عبور"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <button type="submit">ورود</button>
+        </form>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "../components/Header";
 import { ToastContainer, toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/apiClient";
 import { ResponsiveContainer, PieChart, Pie, Cell, Label } from "recharts";
 import { motion } from "framer-motion";
@@ -9,31 +9,17 @@ const KpiDashboard = () => {
   const [selectedCard, setSelectedCard] = useState(null);
   const isLight = document.documentElement.classList.contains("light");
   const [kpiMetrics, setKpiMetrics] = useState(null);
-  const [showBarChart, setShowBarChart] = useState(true);
+  const [showBarChart, setShowBarChart] = useState(false);
   const [systemCompletionPercent, setSystemCompletionPercent] = useState(0);
   const barChartRef = useRef(null);
   const [isLoadingDepartmanMetrics, setIsLoadingDepartmanMetrics] =
     useState(false);
   const [departmanMetrics, setDepartmanMetrics] = useState([]);
+  const [companyMetrics, setCompanyMetrics] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState("");
   const [selectedBranch, setSelectedBranch] = useState("");
   const navigate = useNavigate();
-
-  const demoDepartmanMetrics = useMemo(
-    () => [
-      { name: "فروش", coveragePercent: 93, employeeCount: 14 },
-
-      { name: "امور مالی", coveragePercent: 91, employeeCount: 12 },
-      { name: "منابع انسانی", coveragePercent: 91, employeeCount: 11 },
-      { name: "تولید", coveragePercent: 92, employeeCount: 24 },
-      { name: "IT", coveragePercent: 97, employeeCount: 8 },
-      { name: "تدارکات", coveragePercent: 96, employeeCount: 10 },
-      { name: "زنجیره تامین", coveragePercent: 93, employeeCount: 10 },
-      { name: "مدیریت", coveragePercent: 94, employeeCount: 10 },
-      { name: "پروژه", coveragePercent: 92, employeeCount: 10 },
-      { name: "برنامه ریزی", coveragePercent: 97, employeeCount: 10 },
-    ],
-    []
-  );
+  const location = useLocation();
 
   const demoSystemCompletionPercent = 94;
 
@@ -66,16 +52,116 @@ const KpiDashboard = () => {
     setSystemCompletionPercent(demoSystemCompletionPercent);
   }
 
-  async function loadDepartmanMetrics(quarter, fiscalYear) {
+  function mapCompanyToBranch(code) {
+    const m = {
+      "Industrial Group": "Group",
+      Iranian: "ایرانیان",
+      IRN: "خوزستان",
+      TKF: "تخته فشرده",
+      KHS: "خراسان",
+    };
+    return m[code] || code;
+  }
+
+  async function loadCompaniesFromApprovalChains() {
     setIsLoadingDepartmanMetrics(true);
     try {
-      setDepartmanMetrics(demoDepartmanMetrics);
+      const branches = ["Group", "ایرانیان", "خراسان", "خوزستان", "تخته فشرده"];
+      const results = await Promise.all(
+        branches.map(async (branch) => {
+          const r = await api
+            .get(`/users/branch/${encodeURIComponent(branch)}`)
+            .then((x) =>
+              Array.isArray(x?.data)
+                ? x.data
+                : Array.isArray(x?.data?.data)
+                ? x.data.data
+                : []
+            )
+            .catch(() => []);
+          const total = r.length;
+          const linked = r.filter(
+            (row) => row?.managerUser && row?.managerUser?.id
+          ).length;
+          const employees = new Set(
+            r.map((row) => String(row?.employeeId || "")).filter((id) => !!id)
+          );
+          const coveragePercent =
+            total > 0 ? Math.round((linked / total) * 100) : 0;
+          return {
+            key: branch,
+            name: branch,
+            coveragePercent,
+            employeeCount: employees.size,
+          };
+        })
+      );
+      setCompanyMetrics(
+        results.sort((a, b) => b.coveragePercent - a.coveragePercent)
+      );
     } catch (e) {
-      toast.error("خطا در دریافت داده‌های دپارتمان‌ها");
-      setDepartmanMetrics(demoDepartmanMetrics);
+      toast.error("خطا در دریافت شرکت‌ها از approval_chains");
+      setCompanyMetrics([]);
     } finally {
       setIsLoadingDepartmanMetrics(false);
     }
+  }
+
+  async function loadDepartmentsFromApprovalChains(branch) {
+    setIsLoadingDepartmanMetrics(true);
+    try {
+      const r2 = await api.get(`/users/branch/${encodeURIComponent(branch)}`);
+      const rows = Array.isArray(r2?.data)
+        ? r2.data
+        : Array.isArray(r2?.data?.data)
+        ? r2.data.data
+        : [];
+      const deptMap = new Map();
+      for (const c of rows) {
+        const depRaw = String(c?.department || "")
+          .replaceAll("ي", "ی")
+          .replaceAll("ك", "ک")
+          .trim();
+        if (depRaw.toLowerCase() === "superadmin") {
+          continue;
+        }
+        const dep = depRaw || "نامشخص";
+        const hasManager = c?.managerUser && c?.managerUser?.id ? true : false;
+        const empId = String(c?.employeeId || "").trim();
+        if (!deptMap.has(dep)) {
+          deptMap.set(dep, {
+            totalChainLinks: 0,
+            linkedChainLinks: 0,
+            employeeSet: new Set(),
+          });
+        }
+        const agg = deptMap.get(dep);
+        agg.totalChainLinks += 1;
+        if (hasManager) agg.linkedChainLinks += 1;
+        if (empId) agg.employeeSet.add(empId);
+      }
+      const list = Array.from(deptMap.entries())
+        .map(([dep, agg]) => ({
+          key: dep,
+          name: dep,
+          coveragePercent:
+            agg.totalChainLinks > 0
+              ? Math.round((agg.linkedChainLinks / agg.totalChainLinks) * 100)
+              : 0,
+          employeeCount: agg.employeeSet.size,
+        }))
+        .sort((a, b) => b.coveragePercent - a.coveragePercent);
+      setDepartmanMetrics(list);
+    } catch (e) {
+      toast.error("خطا در دریافت دپارتمان‌ها از approval_chains");
+      setDepartmanMetrics([]);
+    } finally {
+      setIsLoadingDepartmanMetrics(false);
+    }
+  }
+
+  async function loadDepartmanMetrics(quarter, fiscalYear) {
+    await loadCompaniesFromApprovalChains();
   }
 
   useEffect(() => {
@@ -85,8 +171,23 @@ const KpiDashboard = () => {
     loadDepartmanMetrics(quarter, fiscalYear);
   }, []);
   useEffect(() => {
-    loadDepartmanMetrics(getCurrentQuarter(), getCurrentYear());
+    const quarter = getCurrentQuarter();
+    const fiscalYear = getCurrentYear();
+    loadDepartmanMetrics(quarter, fiscalYear);
   }, [selectedBranch]);
+  useEffect(() => {
+    if (selectedCompany) {
+      const branch = selectedCompany;
+      loadDepartmentsFromApprovalChains(branch);
+    }
+  }, [selectedCompany]);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const companyParam = String(params.get("company") || "").trim();
+    if (companyParam) {
+      setSelectedCompany(companyParam);
+    }
+  }, [location.search]);
   return (
     <div className="flex-1 overflow-auto relative z-10">
       <Header title={"داشبورد"} />
@@ -246,52 +347,56 @@ const KpiDashboard = () => {
                       isLight ? "text-gray-900" : "text-gray-100"
                     }`}
                   >
-                    دپارتمان‌ها
+                    {!selectedCompany ? "شرکت‌ها" : "دپارتمان‌ها"}
                   </h3>
-                  {/* <p
-                      className={`${
-                        isLight ? "text-gray-600" : "text-gray-400"
-                      } text-sm`}
-                    >
-                    </p> */}
                 </div>
-                {/* <div className="mb-6">
-                  <div className="flex items-center gap-3" dir="rtl">
-                    <label
-                      className={`text-sm ${
-                        isLight ? "text-gray-700" : "text-gray-300"
-                      }`}
-                    >
-                      شعبه
-                    </label>
-                    <select
-                      value={selectedBranch}
-                      onChange={(e) => setSelectedBranch(e.target.value)}
-                      className={`rounded-lg px-3 py-2 border ${
-                        isLight
-                          ? "bg-white/80 border-gray-300 text-gray-900"
-                          : "bg-gray-800/60 border-gray-700 text-gray-100"
-                      }`}
-                    >
-                      <option value="">همه شعبه‌ها</option>
-                      <option value="Group">Group</option>
-                      <option value="ایرانیان">ایرانیان</option>
-                      <option value="خراسان">خراسان</option>
-                      <option value="خوزستان">خوزستان</option>
-                      <option value="تخته فشرده">تخته فشرده</option>
-                    </select>
-                  </div>
-                </div> */}
+
                 {isLoadingDepartmanMetrics ? (
                   <div className="text-center text-gray-400 py-20">
                     <div className="animate-pulse">
                       در حال بارگذاری داده‌های دپارتمان‌ها...
                     </div>
                   </div>
-                ) : departmanMetrics.length > 0 ? (
+                ) : (
+                    !selectedCompany
+                      ? companyMetrics.length > 0
+                      : departmanMetrics.length > 0
+                  ) ? (
                   <div dir="rtl">
+                    {selectedCompany && (
+                      <div className="flex items-center justify-between mb-4">
+                        <div
+                          className={`text-sm ${
+                            isLight ? "text-gray-700" : "text-gray-300"
+                          }`}
+                        >
+                          شرکت انتخاب‌شده:{" "}
+                          {
+                            (
+                              companyMetrics.find(
+                                (c) => c.key === selectedCompany
+                              ) || {}
+                            ).name
+                          }
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCompany("")}
+                          className={`px-3 py-2 rounded-lg border ${
+                            isLight
+                              ? "bg-white/80 border-gray-300 text-gray-900"
+                              : "bg-gray-800/60 border-gray-700 text-gray-100"
+                          }`}
+                        >
+                          بازگشت به شرکت‌ها
+                        </button>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {departmanMetrics.map((entry) => {
+                      {(selectedCompany
+                        ? departmanMetrics
+                        : companyMetrics
+                      ).map((entry) => {
                         const completionPercent = Math.round(
                           Number(entry.coveragePercent || 0)
                         );
@@ -310,13 +415,17 @@ const KpiDashboard = () => {
                         return (
                           <button
                             type="button"
-                            key={entry.name}
+                            key={entry.key || entry.name}
                             onClick={() => {
-                              navigate(
-                                `/kpipeopleworks?departman=${encodeURIComponent(
-                                  entry.name
-                                )}`
-                              );
+                              if (!selectedCompany) {
+                                setSelectedCompany(entry.key);
+                              } else {
+                                navigate(
+                                  `/kpipeopleworks?departman=${encodeURIComponent(
+                                    entry.key
+                                  )}`
+                                );
+                              }
                             }}
                             className={`rounded-2xl p-4 border transition-all ${
                               isLight
@@ -331,16 +440,6 @@ const KpiDashboard = () => {
                             >
                               {entry.name}
                             </div>
-                            {/* <div
-                              className={`text-sm mb-4 ${
-                                isLight ? "text-gray-600" : "text-gray-400"
-                              }`}
-                            >
-                              کارمند:{" "}
-                              {parseInt(
-                                entry.employeeCount || 0
-                              ).toLocaleString()}
-                            </div> */}
                             <div style={{ height: 220, position: "relative" }}>
                               <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
@@ -367,25 +466,6 @@ const KpiDashboard = () => {
                                       position="center"
                                     />
                                   </Pie>
-                                  {/* <Tooltip
-                                      formatter={(value, name) => [
-                                        `${parseInt(value || 0)}%`,
-                                        name,
-                                      ]}
-                                      contentStyle={{
-                                        backgroundColor: isLight
-                                          ? "#ffffff"
-                                          : "#1f2937",
-                                        border: `1px solid ${
-                                          isLight ? "#e5e7eb" : "#374151"
-                                        }`,
-                                        borderRadius: "12px",
-                                        color: isLight ? "#111827" : "#e5e7eb",
-                                        direction: "rtl",
-                                        padding: "14px",
-                                        fontSize: "14px",
-                                      }}
-                                    /> */}
                                 </PieChart>
                               </ResponsiveContainer>
                             </div>
@@ -413,11 +493,6 @@ const KpiDashboard = () => {
                               x2="0"
                               y2="1"
                             >
-                              {/* Change these colors to customize Bar Chart */}
-                              {/* Example: Green gradient: #10b981, #059669, #047857 */}
-                              {/* Example: Purple gradient: #8b5cf6, #7c3aed, #6d28d9 */}
-                              {/* Example: Red gradient: #ef4444, #dc2626, #b91c1c */}
-                              {/* Example: Orange gradient: #f97316, #ea580c, #c2410c */}
                               <stop
                                 offset="0%"
                                 stopColor="#016630"
@@ -544,61 +619,6 @@ const KpiDashboard = () => {
                         </BarChart>
                       </ResponsiveContainer>
                     )}
-
-                    {/* Modern Summary Stats */}
-                    {/* <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-gradient-to-br from-blue-600/20 to-blue-700/20 rounded-xl p-6 border border-blue-500/50 shadow-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="text-sm text-gray-300 font-medium">
-                              مجموع کل
-                            </div>
-                            <div className="text-2xl">📈</div>
-                          </div>
-                          <div className="text-3xl font-bold text-blue-400">
-                            {facilityMetrics
-                              .reduce((sum, f) => sum + f.total, 0)
-                              .toLocaleString()}
-                          </div>
-                          <div className="text-xs text-gray-400 mt-2">
-                            KPI تمام شرکت‌ها
-                          </div>
-                        </div>
-                        <div className="bg-gradient-to-br from-indigo-600/20 to-indigo-700/20 rounded-xl p-6 border border-indigo-500/50 shadow-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="text-sm text-gray-300 font-medium">
-                              تعداد شرکت‌ها
-                            </div>
-                            <div className="text-2xl">🏢</div>
-                          </div>
-                          <div className="text-3xl font-bold text-indigo-400">
-                            {facilityMetrics.length}
-                          </div>
-                          <div className="text-xs text-gray-400 mt-2">
-                            شرکت فعال
-                          </div>
-                        </div>
-                        <div className="bg-gradient-to-br from-purple-600/20 to-purple-700/20 rounded-xl p-6 border border-purple-500/50 shadow-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="text-sm text-gray-300 font-medium">
-                              میانگین
-                            </div>
-                            <div className="text-2xl">📊</div>
-                          </div>
-                          <div className="text-3xl font-bold text-purple-400">
-                            {facilityMetrics.length > 0
-                              ? Math.round(
-                                  facilityMetrics.reduce(
-                                    (sum, f) => sum + f.total,
-                                    0
-                                  ) / facilityMetrics.length
-                                ).toLocaleString()
-                              : 0}
-                          </div>
-                          <div className="text-xs text-gray-400 mt-2">
-                            KPI به ازای هر شرکت
-                          </div>
-                        </div>
-                      </div> */}
                   </div>
                 ) : (
                   <div className="text-center text-gray-400 py-20">
@@ -608,24 +628,6 @@ const KpiDashboard = () => {
                 )}
               </motion.div>
             )}
-
-            {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                {facilities.map((title) => (
-                  <div
-                    key={title}
-                    className={`backdrop-blur-md shadow-lg rounded-xl p-6 border hover:shadow-xl transition-shadow duration-300 hover:scale-105 cursor-pointer ${
-                      title === "پاک چوب تخته فشرده" || title === "تخته فشرده"
-                        ? "bg-amber-800 bg-opacity-50 border-amber-500"
-                        : "bg-green-800 bg-opacity-50 border-gray-700 hover:bg-gray-600"
-                    }`}
-                    onClick={() => handleCardClick(title)}
-                  >
-                    <h3 className="text-lg font-semibold text-gray-100 text-center">
-                      {title}
-                    </h3>
-                  </div>
-                ))}
-              </div> */}
           </div>
         </div>
       </main>

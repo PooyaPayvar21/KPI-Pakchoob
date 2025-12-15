@@ -15,7 +15,7 @@ import { AnimatePresence, color, motion } from "framer-motion";
 import { Tooltip } from "@mui/material";
 
 const Sidebar = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const isLight = document.documentElement.classList.contains("light");
   const [displayName, setDisplayName] = useState("");
