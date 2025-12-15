@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@font-face {
+  font-family: "CustomFont";
+  src: url("path/to/font.woff2") format("woff2");
+  font-display: swap; /* This will help ensure text is visible immediately */
+}
+
+/* --- Custom styles for react-multi-date-picker to stack time below date --- */
+.rmdp-wrapper .rmdp-panel {
+  flex-direction: column !important;
+}
+.rmdp-panel .rmdp-calendar {
+  width: 100% !important;
+}
+.rmdp-panel .rmdp-time-picker {
+  width: 100% !important;
+  margin-top: 8px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
